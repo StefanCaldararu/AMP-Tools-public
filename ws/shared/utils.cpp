@@ -12,14 +12,17 @@
 namespace utils{
     
     bool sensor(double epsilon, double theta, std::vector<amp::Obstacle2D> obstacles, Eigen::Vector2d point) {
-        //get the point in the direction of theta
-        Eigen::Vector2d sensor_hit = point + epsilon * Eigen::Vector2d(std::cos(theta), std::sin(theta));
-        //check if this is inside of an obstacle
-        for(auto& obstacle : obstacles){
-            if(raycastObstacleDetection(obstacle, sensor_hit)){
-                return true; //hit an obstacle
+        // for(int i = 0; i < 50; i+=5){
+            double new_theta = theta;
+            //get the point in the direction of theta
+            Eigen::Vector2d sensor_hit = point + epsilon * Eigen::Vector2d(std::cos(new_theta), std::sin(new_theta));
+            //check if this is inside of an obstacle
+            for(auto& obstacle : obstacles){
+                if(raycastObstacleDetection(obstacle, sensor_hit)){
+                    return true; //hit an obstacle
+                }
             }
-        }
+        // }
         return false;
     }
 
@@ -111,6 +114,25 @@ namespace utils{
         return issue_obs;
     }
 
+    bool checkIntersect(const Eigen::Vector2d& p1, const Eigen::Vector2d& p2, const Eigen::Vector2d& q1, const Eigen::Vector2d& q2){
+        //TODO: write this function
+        Eigen::Vector2d r = p2 - p1;
+            Eigen::Vector2d s = q2 - q1;
+            Eigen::Vector2d qp = q1 - p1;
+            double rxs = r.x() * s.y() - r.y() * s.x();
+            double qpxr = qp.x() * r.y() - qp.y() * r.x();
+            if(std::abs(rxs) < 1e-10){
+                return false;
+            }
+            double t = (qp.x() * s.y() - qp.y() * s.x()) / rxs;
+            double u = qpxr / rxs;
+            if(t >= 0 && t<=1 && u>=0 && u<=1){
+                return true;
+            }
+            return false;
+
+    }
+
     Eigen::Vector2d intersect(const Eigen::Vector2d& p1, const Eigen::Vector2d& p2, const amp::Obstacle2D& obstacle) {
         Eigen::Vector2d intersec;
         double dist = 0;
@@ -183,12 +205,32 @@ namespace utils{
         return end - direction * dist;
     }
 
+    bool isPointOnSegment(const Eigen::Vector2d& p, const Eigen::Vector2d& a, const Eigen::Vector2d& b) {
+        return false;
+        // Vector from a to b and a to p
+        Eigen::Vector2d ab = b - a;
+        Eigen::Vector2d ap = p - a;
+
+        // Check if cross product is zero => colinear
+        double cross = ab.x() * ap.y() - ab.y() * ap.x();
+        if (std::abs(cross) > 1e-10) return false; // Not colinear
+
+        // Check if dot product is within segment range
+        double dot = ap.dot(ab);
+        if (dot < 0 || dot > ab.squaredNorm()) return false; // Outside segment
+
+        return true; // Point is on the segment
+    }
+
     bool raycastObstacleDetection(const amp::Obstacle2D& obstacle, const Eigen::Vector2d& point) {
         bool inside = false;
         int numV = obstacle.verticesCCW().size();
         for(int i = 0, j = numV-1; i < numV; j = i++){
             const Eigen::Vector2d& pi = obstacle.verticesCCW()[i];
             const Eigen::Vector2d& pj = obstacle.verticesCCW()[j];
+            if (isPointOnSegment(point, pi, pj)) {
+                return true; // On the boundary is considered "inside"
+            }
             //now check for intersects when casting to the right
             //if the line is horizontal, no intersect so stay same
             if(pi.y() == pj.y()) {

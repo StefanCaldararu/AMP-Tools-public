@@ -5,9 +5,9 @@
 
 // Implement your methods in the `.cpp` file, for example:
 
-
-#define BUG 1
-//#define BUG 2
+//NOTE: EXACTLY ONE OF THESE MUST BE DEFINED FOR THE CODE TO COMPILE.
+// #define BUG1
+#define BUG2
 
 
 
@@ -27,6 +27,10 @@ amp::Path2D MyBugAlgorithm::plan(const amp::Problem2D& problem) {
     bool wall_follow = false;
     path.waypoints.push_back(problem.q_init);
     while((curr_point - problem.q_goal).norm() > 2 * epsilon){
+        // std::cout << count << std::endl << count2 << std::endl;
+        if(curr_point.x() >0 && curr_point.x() < 0.0005 && curr_point.y() > 0 && curr_point.y() < 0.0005){
+            std::cout<< curr_point << std::endl;
+        }
         count2 ++;
         if(count2 > 800000){
             std::cout << "hit path count. curr_point: " << curr_point << std::endl;
@@ -49,16 +53,20 @@ amp::Path2D MyBugAlgorithm::plan(const amp::Problem2D& problem) {
             path.waypoints.push_back(curr_point);
             //enter wall follow mode. go around the obstacle, until we get close to the orig point and have a straight line path. Once that happens, we can append our new part of the path...
             
-            if(BUG == 1){
-
-            
                 Eigen::Vector2d start_point = curr_point;
                 Eigen::Vector2d closest_point = curr_point;
                 double dist_to_goal = (curr_point - problem.q_goal).norm();
                 bool started_moving = false;
                 int num_path_points = path.waypoints.size();
                 int move_count = 0;
-                while(!started_moving || (curr_point - start_point).norm() > epsilon){
+
+
+                #ifdef BUG1
+                    while(!started_moving || (curr_point - start_point).norm() > epsilon){
+                #endif
+                #ifdef BUG2
+                while(!started_moving  || !utils::checkIntersect(path.waypoints[path.waypoints.size()-1], curr_point, start_point, problem.q_goal) || (start_point - problem.q_goal).norm() < (curr_point - problem.q_goal).norm()){//or no intersect or further from goal than start_point//TODO: add lines here){
+                #endif
                     count++;
                     if(count > 599990){
                         std::cout << "hit wall count " << theta << std::endl;
@@ -71,8 +79,13 @@ amp::Path2D MyBugAlgorithm::plan(const amp::Problem2D& problem) {
                     
                     //if the front sensor sees the obstacle or TODO: pi/8 sensor sees the obstacle turn left
                     if(utils::sensor(epsilon, theta, problem.obstacles, curr_point)){
+                        double old_theta = theta;
                         while(utils::sensor(epsilon, theta,     problem.obstacles, curr_point)){
                         theta = theta + epsilon;
+                        if(abs(old_theta - theta) > 360){
+                            //bad
+                            return path;
+                        }
                         }
                         path.waypoints.push_back(curr_point);
                         curr_point = curr_point + epsilon/5 * Eigen::Vector2d(std::cos(theta), std::sin(theta)); 
@@ -121,20 +134,21 @@ amp::Path2D MyBugAlgorithm::plan(const amp::Problem2D& problem) {
 
                 //if the 3pi/8 sensor doesn't see the obstacle, turn right
                 //if the pi/2 sensor doesn't see the obstacle, 
-            
-                //go back to the closest point.
-                while((curr_point - problem.q_goal).norm() != dist_to_goal){
-                    curr_point = path.waypoints[num_path_points];
-                    path.waypoints.push_back(curr_point);
-                    num_path_points++;
+                #ifdef BUG1
+                    //go back to the closest point.
+                    while((curr_point - problem.q_goal).norm() != dist_to_goal){
+                        curr_point = path.waypoints[num_path_points];
+                        path.waypoints.push_back(curr_point);
+                        num_path_points++;
 
-                }
+                    }
+                #endif
                 // std::cout << "Closest point: " << curr_point<< std::endl;
                 //reset theta
                 direction = problem.q_goal - curr_point;
                 theta = std::atan2(direction.y(), direction.x());
                 // return path;
-            }
+                path.waypoints.push_back(curr_point);
         }
     }
     path.waypoints.push_back(problem.q_goal);
